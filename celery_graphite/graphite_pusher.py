@@ -20,9 +20,11 @@ For events:
     "what": "Event - deploy",
     "tags": ["deploy"],
     "when": 1467844481,
-    "data": "deploy of master branch happened at Wed Jul  6 22:34:41 UTC 2016"
+    "data": "deploy of master branch happened at Wed Jul 6 22:34:41 UTC 2016"
 }
 """
+
+
 logger = logging.getLogger('GraphitePusher')
 
 
@@ -51,6 +53,8 @@ class GraphitePusher:
     def add(self, timestamp, value, paths: list):
         path = self._get_path(paths)
         self._batch.append((path, (timestamp, value)))
+        logger.debug(f'Adding metrics to {path}, {value}.')
+        logger.debug(f'Batch size {len(self._batch)}/{self._retention}.')
         if len(self._batch) < self._retention:
             return
         logger.info('Reached retention limit, pushing.')
@@ -69,7 +73,7 @@ class GraphitePusher:
 
     def add_event(self, what, tags, when, data):
         if not self._events_url:
-            logger.info('No http_url provided so not pushing event.')
+            logger.warning('No http_url provided so not pushing event.')
             return
 
         if self._tag:

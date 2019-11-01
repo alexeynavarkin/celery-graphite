@@ -1,5 +1,7 @@
 from celery import states as task_states
 from celery.events.snapshot import Polaroid
+from celery.events.state import State
+
 
 from copy import deepcopy
 
@@ -41,7 +43,11 @@ class CeleryCamera(Polaroid):
             }
         return deepcopy(self._dict)
 
-    def _process_tasks(self, state, timestamp):
+    @staticmethod
+    def _extract_task_name(name):
+        return name.split('.')[-1]
+
+    def _process_tasks(self, state: State, timestamp):
         tasks = self._get_dict(state)
         for task in state.tasks.values():
 
@@ -51,6 +57,7 @@ class CeleryCamera(Polaroid):
 
             tasks[task.name][task.state] += 1
             if task.state == task_states.FAILURE:
+                logger.info(f'Adding exception event {task.exception}.')
                 data = task.info() if self._verbose_exception else task.exception
                 self._pusher.add_event(
                     what='Exception',
@@ -61,12 +68,23 @@ class CeleryCamera(Polaroid):
 
         for task, states in tasks.items():
             for state, amount in states.items():
-                self._pusher.add(timestamp, amount, [task, state])
+                task_name = self._extract_task_name(task)
+                logger.debug(f'Adding metrics for {task_name}.{state} - {amount}.')
+                self._pusher.add(timestamp, amount, ['tasks', 'by_name', task_name, state])
 
-    def _process_workers(self, state, timestamp):
+    def _process_workers(self, state: State, timestamp):
+        for worker_name, worker_state in state.workers.items():
+            self._pusher.add(
+                timestamp,
+                worker_state.active,
+                ['workers', 'by_name', worker_name, 'active']
+            )
+
         workers_alive = 0
         for _ in state.alive_workers():
             workers_alive += 1
+
+        logger.info(f'Adding metrics workers.alive {workers_alive}.')
         self._pusher.add(timestamp, workers_alive, ['workers', 'alive'])
 
     def on_shutter(self, state):
