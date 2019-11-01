@@ -12,7 +12,7 @@ with io.open('README.md', encoding='utf-8') as fp:
 
 setup(
     name='celery-graphite',
-    version='1.0.0',
+    version='1.0.1',
     description='Simple Celery metrics exporter to graphite',
     long_description=DESCRIPTION,
     long_description_content_type='text/markdown',
